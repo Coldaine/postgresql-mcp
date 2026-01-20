@@ -4,7 +4,7 @@
  * These tests verify the MCP server works against a real remote PostgreSQL instance.
  * Target: Raspberry Pi (raspberryoracle) via Tailscale
  *
- * Run with: RUN_DEPLOYMENT_TESTS=true npm test -- --testPathPattern=deployment
+ * Run with: RUN_DEPLOYMENT_TESTS=true vitest run packages/core/test/deployment/
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
@@ -14,6 +14,14 @@ import { pgQueryHandler } from "../../src/tools/pg-query.js";
 import { pgSchemaHandler } from "../../src/tools/pg-schema.js";
 import { pgMonitorHandler } from "../../src/tools/pg-monitor.js";
 import { deploymentConfig, isDeploymentTestEnabled } from "./config.js";
+
+interface TableRow {
+    name: string;
+}
+
+interface ColumnRow {
+    name: string;
+}
 
 describe.skipIf(!isDeploymentTestEnabled())(`Deployment: ${deploymentConfig.name}`, () => {
     let executor: PostgresExecutor;
@@ -132,6 +140,20 @@ describe.skipIf(!isDeploymentTestEnabled())(`Deployment: ${deploymentConfig.name
                 await executor.execute(`DROP TABLE ${tableName}`);
             }
         });
+
+        it("should throw error for invalid SQL syntax", async () => {
+            await expect(pgQueryHandler({
+                action: "read",
+                sql: "SELECT * FORM invalid_syntax",
+            }, context)).rejects.toThrow(/syntax error/i);
+        });
+
+        it("should throw error for non-existent table", async () => {
+            await expect(pgQueryHandler({
+                action: "read",
+                sql: "SELECT * FROM table_that_does_not_exist_xyz123",
+            }, context)).rejects.toThrow(/does not exist|relation.*not found/i);
+        });
     });
 
     describe("pg_schema", () => {
@@ -142,7 +164,7 @@ describe.skipIf(!isDeploymentTestEnabled())(`Deployment: ${deploymentConfig.name
             }, context);
 
             expect(result.rows.length).toBeGreaterThan(0);
-            const tableNames = result.rows.map((t: any) => t.name);
+            const tableNames = result.rows.map((t: TableRow) => t.name);
             expect(tableNames).toContain("test_products");
         });
 
@@ -154,7 +176,7 @@ describe.skipIf(!isDeploymentTestEnabled())(`Deployment: ${deploymentConfig.name
             }, context);
 
             expect(result.columns.length).toBeGreaterThan(0);
-            const columnNames = result.columns.map((c: any) => c.name);
+            const columnNames = result.columns.map((c: ColumnRow) => c.name);
             expect(columnNames).toContain("id");
             expect(columnNames).toContain("name");
             expect(columnNames).toContain("price");
@@ -187,6 +209,9 @@ describe.skipIf(!isDeploymentTestEnabled())(`Deployment: ${deploymentConfig.name
             }, context);
 
             expect(result.rows).toBeDefined();
+            expect(Array.isArray(result.rows)).toBe(true);
+            // Should have at least our own connection
+            expect(result.rows.length).toBeGreaterThanOrEqual(1);
         });
 
         it("should retrieve database size", async () => {
@@ -195,6 +220,8 @@ describe.skipIf(!isDeploymentTestEnabled())(`Deployment: ${deploymentConfig.name
             }, context);
 
             expect(result.rows).toBeDefined();
+            expect(Array.isArray(result.rows)).toBe(true);
+            expect(result.rows.length).toBeGreaterThan(0);
         });
     });
 
