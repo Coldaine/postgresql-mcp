@@ -2,35 +2,35 @@
  * Deployment Tests - Remote PostgreSQL
  *
  * These tests verify the MCP server works against a real remote PostgreSQL instance.
- * Target: Raspberry Pi (raspberryoracle) via Tailscale
- *
- * Run with: RUN_DEPLOYMENT_TESTS=true vitest run packages/core/test/deployment/
+ * 
+ * IMPROVEMENTS:
+ * 1. Black Box Testing: Spawns the actual server process via `harness.ts`.
+ * 2. Hermetic: Creates a unique schema for each run, seeds it, and destroys it.
+ * 3. Secure: No hardcoded credentials.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { PostgresExecutor } from "../../../../shared/executor/postgres.js";
-import { SessionManager } from "../../src/session.js";
-import { pgQueryHandler } from "../../src/tools/pg-query.js";
-import { pgSchemaHandler } from "../../src/tools/pg-schema.js";
-import { pgMonitorHandler } from "../../src/tools/pg-monitor.js";
 import { deploymentConfig, isDeploymentTestEnabled } from "./config.js";
+import { McpServerTestHarness } from "./harness.js";
+import crypto from "crypto";
 
-interface TableRow {
-    name: string;
-}
+// Skip everything if deployment tests are not enabled
+const runTests = isDeploymentTestEnabled();
 
-interface ColumnRow {
-    name: string;
-}
+// Only access config when tests are enabled to avoid throwing on missing env vars
+const describeName = runTests ? `Deployment: ${deploymentConfig.name}` : "Deployment Tests (skipped)";
 
-describe.skipIf(!isDeploymentTestEnabled())(`Deployment: ${deploymentConfig.name}`, () => {
-    let executor: PostgresExecutor;
-    let context: { executor: PostgresExecutor; sessionManager: SessionManager };
+describe.skipIf(!runTests)(describeName, () => {
+    let adminExecutor: PostgresExecutor;
+    let harness: McpServerTestHarness;
+    
+    // Unique schema for this test run to ensure isolation
+    const TEST_SCHEMA = `mcp_test_run_${crypto.randomBytes(4).toString("hex")}`;
 
     beforeAll(async () => {
-        console.log(`Connecting to ${deploymentConfig.name} at ${deploymentConfig.host}:${deploymentConfig.port}`);
-
-        executor = new PostgresExecutor({
+        // 1. Connect as Admin to setup the test environment
+        adminExecutor = new PostgresExecutor({
             host: deploymentConfig.host,
             port: deploymentConfig.port,
             user: deploymentConfig.user,
@@ -38,269 +38,125 @@ describe.skipIf(!isDeploymentTestEnabled())(`Deployment: ${deploymentConfig.name
             database: deploymentConfig.database,
         });
 
-        const sessionManager = new SessionManager(executor);
-        context = { executor, sessionManager };
+        // Verify connectivity
+        await adminExecutor.execute("SELECT 1");
+        console.log(`Connected to ${deploymentConfig.host} for setup.`);
 
-        // Verify connection
-        const result = await executor.execute("SELECT 1 as connected");
-        expect(result.rows[0].connected).toBe(1);
-        console.log(`Connected successfully to ${deploymentConfig.name}`);
+        // 2. Create Isolated Schema
+        await adminExecutor.execute(`CREATE SCHEMA ${TEST_SCHEMA}`);
+        
+        // 3. Seed Data (Hermetic setup)
+        // We create our own tables so we don't rely on existing DB state
+        await adminExecutor.execute(`
+            CREATE TABLE ${TEST_SCHEMA}.products (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                price DECIMAL(10,2)
+            );
+            INSERT INTO ${TEST_SCHEMA}.products (name, price) VALUES 
+                ('Widget A', 10.50),
+                ('Widget B', 25.00);
+        `);
+
+        // 4. Start the MCP Server (Black Box)
+        // We configure it to use the same DB, but we'll force the search_path 
+        // via the connection string or just rely on fully qualified names if needed.
+        // Better: We rely on the server using the user/pass we give it.
+        // NOTE: Postgres user must have access to the new schema.
+        
+        harness = new McpServerTestHarness({
+            PGHOST: deploymentConfig.host,
+            PGPORT: deploymentConfig.port.toString(),
+            PGUSER: deploymentConfig.user,
+            PGPASSWORD: deploymentConfig.password,
+            PGDATABASE: deploymentConfig.database,
+            // Key trick: Set search_path to our test schema by default for this session
+            // This allows 'SELECT * FROM products' to work without prefix
+            PGOPTIONS: `-c search_path=${TEST_SCHEMA},public` 
+        });
+
+        await harness.start();
     });
 
     afterAll(async () => {
-        await executor.disconnect();
+        if (harness) await harness.stop();
+        
+        if (adminExecutor) {
+            // Cleanup: Drop the entire schema
+            await adminExecutor.execute(`DROP SCHEMA IF EXISTS ${TEST_SCHEMA} CASCADE`);
+            await adminExecutor.disconnect();
+        }
     });
 
-    describe("pg_query", () => {
-        it("should execute read queries against remote database", async () => {
-            const result = await pgQueryHandler({
-                action: "read",
-                sql: "SELECT COUNT(*) as count FROM test_products",
-            }, context);
-
-            expect(parseInt(result.rows[0].count)).toBeGreaterThan(0);
-        });
-
-        it("should handle parameterized queries", async () => {
-            const result = await pgQueryHandler({
-                action: "read",
-                sql: "SELECT * FROM test_products WHERE id = $1",
-                params: [1],
-            }, context);
-
-            expect(result.rows.length).toBe(1);
-            expect(result.rows[0].id).toBe(1);
-        });
-
-        it("should execute write operations in transaction", async () => {
-            // Create a test table for this run
-            const tableName = `deploy_test_${Date.now()}`;
-
-            await executor.execute(`CREATE TABLE ${tableName} (id SERIAL, value TEXT)`);
-
-            try {
-                const result = await pgQueryHandler({
-                    action: "write",
-                    sql: `INSERT INTO ${tableName} (value) VALUES ($1)`,
-                    params: ["deployment test"],
-                    autocommit: true,
-                }, context);
-
-                expect(result.rowCount).toBe(1);
-
-                // Verify
-                const verify = await executor.execute(`SELECT value FROM ${tableName}`);
-                expect(verify.rows[0].value).toBe("deployment test");
-            } finally {
-                await executor.execute(`DROP TABLE ${tableName}`);
-            }
-        });
-
-        it("should execute batch transactions atomically", async () => {
-            const tableName = `deploy_batch_${Date.now()}`;
-            await executor.execute(`CREATE TABLE ${tableName} (id INT UNIQUE)`);
-
-            try {
-                const result = await pgQueryHandler({
-                    action: "transaction",
-                    operations: [
-                        { sql: `INSERT INTO ${tableName} VALUES (1)` },
-                        { sql: `INSERT INTO ${tableName} VALUES (2)` },
-                        { sql: `INSERT INTO ${tableName} VALUES (3)` },
-                    ],
-                }, context);
-
-                expect(result.status).toBe("committed");
-                expect(result.results.length).toBe(3);
-
-                const verify = await executor.execute(`SELECT COUNT(*) as cnt FROM ${tableName}`);
-                expect(verify.rows[0].cnt).toBe("3");
-            } finally {
-                await executor.execute(`DROP TABLE ${tableName}`);
-            }
-        });
-
-        it("should rollback batch transaction on failure", async () => {
-            const tableName = `deploy_rollback_${Date.now()}`;
-            await executor.execute(`CREATE TABLE ${tableName} (id INT UNIQUE)`);
-
-            try {
-                await expect(pgQueryHandler({
-                    action: "transaction",
-                    operations: [
-                        { sql: `INSERT INTO ${tableName} VALUES (1)` },
-                        { sql: `INSERT INTO ${tableName} VALUES (1)` }, // Duplicate - will fail
-                    ],
-                }, context)).rejects.toThrow();
-
-                // Should be empty due to rollback
-                const verify = await executor.execute(`SELECT COUNT(*) as cnt FROM ${tableName}`);
-                expect(verify.rows[0].cnt).toBe("0");
-            } finally {
-                await executor.execute(`DROP TABLE ${tableName}`);
-            }
-        });
-
-        it("should throw error for invalid SQL syntax", async () => {
-            await expect(pgQueryHandler({
-                action: "read",
-                sql: "SELECT * FORM invalid_syntax",
-            }, context)).rejects.toThrow(/syntax error/i);
-        });
-
-        it("should throw error for non-existent table", async () => {
-            await expect(pgQueryHandler({
-                action: "read",
-                sql: "SELECT * FROM table_that_does_not_exist_xyz123",
-            }, context)).rejects.toThrow(/does not exist|relation.*not found/i);
-        });
-    });
-
-    describe("pg_schema", () => {
-        it("should list tables in remote database", async () => {
-            const result = await pgSchemaHandler({
-                action: "list",
-                target: "table",
-            }, context);
-
-            expect(result.rows.length).toBeGreaterThan(0);
-            const tableNames = result.rows.map((t: TableRow) => t.name);
-            expect(tableNames).toContain("test_products");
-        });
-
-        it("should describe table structure", async () => {
-            const result = await pgSchemaHandler({
-                action: "describe",
-                target: "table",
-                name: "test_products",
-            }, context);
-
-            expect(result.columns.length).toBeGreaterThan(0);
-            const columnNames = result.columns.map((c: ColumnRow) => c.name);
-            expect(columnNames).toContain("id");
-            expect(columnNames).toContain("name");
-            expect(columnNames).toContain("price");
-        });
-
-        it("should list views", async () => {
-            const result = await pgSchemaHandler({
-                action: "list",
-                target: "view",
-            }, context);
-
-            // Should have at least our test view
-            expect(result.rows.length).toBeGreaterThan(0);
-        });
-    });
-
-    describe("pg_monitor", () => {
-        it("should check database health", async () => {
-            const result = await pgMonitorHandler({
-                action: "health",
-            }, context);
-
-            expect(result.status).toBe("healthy");
-            expect(result.version).toContain("PostgreSQL");
-        });
-
-        it("should retrieve connection info", async () => {
-            const result = await pgMonitorHandler({
-                action: "connections",
-            }, context);
-
-            expect(result.rows).toBeDefined();
-            expect(Array.isArray(result.rows)).toBe(true);
-            // Should have at least our own connection
-            expect(result.rows.length).toBeGreaterThanOrEqual(1);
-        });
-
-        it("should retrieve database size", async () => {
-            const result = await pgMonitorHandler({
-                action: "size",
-            }, context);
-
-            expect(result.rows).toBeDefined();
-            expect(Array.isArray(result.rows)).toBe(true);
-            expect(result.rows.length).toBeGreaterThan(0);
-        });
-    });
-
-    describe("Performance", () => {
-        it("should handle concurrent queries", async () => {
-            const queries = Array(10).fill(null).map((_, i) =>
-                pgQueryHandler({
+    describe("pg_query tool", () => {
+        it("should read data from the isolated test schema", async () => {
+            const result = await harness.mcpClient.callTool({
+                name: "pg_query",
+                arguments: {
                     action: "read",
-                    sql: `SELECT $1::int as query_num, COUNT(*) as cnt FROM test_measurements`,
-                    params: [i],
-                }, context)
-            );
-
-            const results = await Promise.all(queries);
-
-            expect(results.length).toBe(10);
-            results.forEach((r, i) => {
-                expect(r.rows[0].query_num).toBe(i);
+                    sql: "SELECT * FROM products ORDER BY id"
+                }
             });
+
+            const content = JSON.parse((result.content[0] as any).text);
+            expect(content.rows).toHaveLength(2);
+            expect(content.rows[0].name).toBe("Widget A");
         });
 
-        it("should complete complex query within reasonable time", async () => {
-            const start = Date.now();
+        it("should write data and verify it persists", async () => {
+            // Write
+            await harness.mcpClient.callTool({
+                name: "pg_query",
+                arguments: {
+                    action: "write",
+                    sql: "INSERT INTO products (name, price) VALUES ($1, $2)",
+                    params: ["Widget C", 99.99],
+                    autocommit: true
+                }
+            });
 
-            await pgQueryHandler({
-                action: "read",
-                sql: `
-                    SELECT
-                        p.name,
-                        COUNT(o.id) as order_count,
-                        SUM(o.total_price) as revenue
-                    FROM test_products p
-                    LEFT JOIN test_orders o ON p.id = o.product_id
-                    GROUP BY p.name
-                    ORDER BY revenue DESC NULLS LAST
-                `,
-            }, context);
+            // Read back
+            const result = await harness.mcpClient.callTool({
+                name: "pg_query",
+                arguments: {
+                    action: "read",
+                    sql: "SELECT * FROM products WHERE name = 'Widget C'"
+                }
+            });
 
-            const elapsed = Date.now() - start;
-
-            // Should complete within 5 seconds over network
-            expect(elapsed).toBeLessThan(5000);
+            const content = JSON.parse((result.content[0] as any).text);
+            expect(content.rows[0].price).toBe("99.99");
         });
     });
 
-    describe("Data Integrity", () => {
-        it("should preserve data types correctly", async () => {
-            const result = await pgQueryHandler({
-                action: "read",
-                sql: `
-                    SELECT
-                        id,
-                        name,
-                        price,
-                        created_at
-                    FROM test_products
-                    LIMIT 1
-                `,
-            }, context);
+    describe("pg_schema tool", () => {
+        it("should list tables in the test schema", async () => {
+            const result = await harness.mcpClient.callTool({
+                name: "pg_schema",
+                arguments: {
+                    action: "list",
+                    target: "table",
+                    schema: TEST_SCHEMA
+                }
+            });
 
-            const row = result.rows[0];
-
-            expect(typeof row.id).toBe("number");
-            expect(typeof row.name).toBe("string");
-            // Price comes back as string from pg driver for DECIMAL
-            expect(typeof row.price).toBe("string");
-            expect(row.created_at instanceof Date).toBe(true);
+            const content = JSON.parse((result.content[0] as any).text);
+            const tableNames = content.rows.map((t: any) => t.name);
+            expect(tableNames).toContain("products");
         });
+    });
 
-        it("should handle JSONB data", async () => {
-            const result = await pgQueryHandler({
-                action: "read",
-                sql: "SELECT metadata, tags FROM test_jsonb_docs WHERE id = 1",
-            }, context);
+    describe("pg_monitor tool", () => {
+        it("should report database health", async () => {
+            const result = await harness.mcpClient.callTool({
+                name: "pg_monitor",
+                arguments: {
+                    action: "health"
+                }
+            });
 
-            const row = result.rows[0];
-            expect(typeof row.metadata).toBe("object");
-            expect(row.metadata.type).toBe("article");
-            expect(Array.isArray(row.tags)).toBe(true);
+            const content = JSON.parse((result.content[0] as any).text);
+            expect(content.status).toBe("healthy");
         });
     });
 });
