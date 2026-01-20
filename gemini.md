@@ -55,8 +55,8 @@ You must document in `/docs/toolDescriptions/pg_query.md`:
 ## Testing
 
 ```bash
-pnpm test           # Run all tests
-pnpm test:watch     # Watch mode
+npm test           # Run all tests
+npm run test:watch # Watch mode
 ```
 
 ## Before Committing
