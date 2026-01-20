@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { QueryExecutor } from "@pg-mcp/shared/executor/interface.js";
+import { SessionManager } from "./session.js";
 
 export const ToolActionSchema = z.object({
     action: z.string(),
@@ -7,6 +8,7 @@ export const ToolActionSchema = z.object({
 
 export interface ActionContext {
     executor: QueryExecutor;
+    sessionManager: SessionManager;
 }
 
 export interface ActionHandler<T extends z.ZodTypeAny, R = any> {

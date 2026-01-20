@@ -10,10 +10,15 @@ interface Session {
 
 export class SessionManager {
     private sessions = new Map<string, Session>();
-    private readonly TTL_MS = 5 * 60 * 1000; // 5 minutes default TTL
+    // 5 minutes default TTL - strictly enforced to prevent resource exhaustion
+    private readonly TTL_MS = 5 * 60 * 1000; 
 
     constructor(private readonly globalExecutor: QueryExecutor) {}
 
+    /**
+     * Creates a new session with a dedicated database connection.
+     * Returns the unique session ID.
+     */
     async createSession(): Promise<string> {
         const id = randomUUID();
         const sessionExecutor = await this.globalExecutor.createSession();
@@ -29,6 +34,10 @@ export class SessionManager {
         return id;
     }
 
+    /**
+     * Retrieves the executor for a given session ID.
+     * Resets the TTL timer on access.
+     */
     getSessionExecutor(id: string): QueryExecutor | undefined {
         const session = this.sessions.get(id);
         if (!session) return undefined;
@@ -41,15 +50,15 @@ export class SessionManager {
         return session.executor;
     }
 
+    /**
+     * Closes a session, releasing the connection and ensuring cleanup.
+     * If a transaction was open, the connection release will trigger an automatic rollback.
+     */
     async closeSession(id: string): Promise<void> {
         const session = this.sessions.get(id);
         if (session) {
             clearTimeout(session.timeoutTimer);
             try {
-                // Rollback is implicit if we just disconnect without commit, 
-                // but good practice might be to try rollback if still active.
-                // However, executor.disconnect() usually releases the client 
-                // which triggers a rollback in PG if in transaction.
                 await session.executor.disconnect();
             } catch (error) {
                 console.error(`Error closing session ${id}:`, error);
@@ -60,7 +69,7 @@ export class SessionManager {
 
     private startTimer(id: string): NodeJS.Timeout {
         return setTimeout(() => {
-            console.error(`Session ${id} timed out. Closing.`);
+            console.error(`[SessionManager] Session ${id} timed out. Auto-closing to prevent leaks.`);
             this.closeSession(id);
         }, this.TTL_MS);
     }
