@@ -34,19 +34,26 @@ export const txHandler: ActionHandler<typeof TxSchema> = {
         // Special handling for BEGIN: It creates the session
         if (params.action === "begin") {
             const sessionId = await context.sessionManager.createSession();
-            const executor = context.sessionManager.getSessionExecutor(sessionId)!;
-
+            let transactionStarted = false;
             try {
-                await executor.execute("BEGIN");
+                const executor = context.sessionManager.getSessionExecutor(sessionId)!;
+                
+                const isoLevel = params.options?.isolation_level
+                    ? ` ISOLATION LEVEL ${params.options.isolation_level.replace("_", " ").toUpperCase()}`
+                    : "";
+                
+                await executor.execute(`BEGIN${isoLevel}`);
+                transactionStarted = true;
                 return {
                     status: "success",
                     session_id: sessionId,
                     message: "Transaction started. Use session_id for all subsequent queries in this transaction."
                 };
-            } catch (error) {
-                // Release the connection if we failed to even start the transaction
-                await context.sessionManager.closeSession(sessionId);
-                throw error;
+            } finally {
+                // If we created a session but failed to start the transaction, clean up immediately.
+                if (!transactionStarted) {
+                    await context.sessionManager.closeSession(sessionId);
+                }
             }
         }
 

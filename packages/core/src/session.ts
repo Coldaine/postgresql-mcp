@@ -39,6 +39,12 @@ export class SessionManager {
             timeoutTimer: null as unknown as NodeJS.Timeout,
         };
 
+        // Atomic check and set: ensure we didn't exceed limit while awaiting connection
+        if (this.sessions.size >= this.MAX_SESSIONS) {
+            await sessionExecutor.disconnect(true);
+            throw new Error(`Maximum session limit (${this.MAX_SESSIONS}) reached. Please close an existing session before creating a new one.`);
+        }
+
         this.sessions.set(id, session);
         session.timeoutTimer = this.startTimer(id);
         return id;

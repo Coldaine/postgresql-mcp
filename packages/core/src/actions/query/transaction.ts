@@ -18,10 +18,11 @@ export const transactionHandler: ActionHandler<typeof TransactionSchema> = {
     handler: async (params, context) => {
         // We use a dedicated session connection just for this batch, then close it.
         // This ensures atomicity and isolation.
-        const sessionId = await context.sessionManager.createSession();
-        const executor = context.sessionManager.getSessionExecutor(sessionId)!;
-
+        let sessionId: string | undefined;
         try {
+            sessionId = await context.sessionManager.createSession();
+            const executor = context.sessionManager.getSessionExecutor(sessionId)!;
+
             await executor.execute("BEGIN");
             const results = [];
             
@@ -43,8 +44,10 @@ export const transactionHandler: ActionHandler<typeof TransactionSchema> = {
                 results
             };
         } finally {
-            // Always close the temporary session
-            await context.sessionManager.closeSession(sessionId);
+            // Always close the temporary session if it was created
+            if (sessionId) {
+                await context.sessionManager.closeSession(sessionId);
+            }
         }
     },
 };

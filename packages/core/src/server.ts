@@ -20,7 +20,7 @@ const executor = new PostgresExecutor({
     host: process.env['PGHOST'] || "localhost",
     port: parseInt(process.env['PGPORT'] || "5432"),
     user: process.env['PGUSER'] || "postgres",
-    password: process.env['PGPASSWORD'] || "postgres",
+    password: process.env['PGPASSWORD'] || "",
     database: process.env['PGDATABASE'] || "postgres",
 });
 
