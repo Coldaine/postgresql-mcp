@@ -78,6 +78,7 @@ export async function setupHttpTransport(server: McpServer, port: number) {
             }
         };
 
+        // Cast needed: StreamableHTTPServerTransport implements Transport but SDK types don't reflect this
         await server.connect(transport as Transport);
         return transport.handleRequest(req, res, req.body);
     });
