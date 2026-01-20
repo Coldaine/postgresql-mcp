@@ -118,12 +118,17 @@ echo "============================================"
 
 # Check connectivity first
 echo "Checking connectivity..."
-if ! nc -z -w5 "$DEPLOY_TEST_HOST" "$DEPLOY_TEST_PORT" 2>/dev/null; then
-    echo "ERROR: Cannot connect to $DEPLOY_TEST_HOST:$DEPLOY_TEST_PORT"
-    echo "Make sure the host is reachable (Tailscale connected?)"
-    exit 1
+if command -v nc >/dev/null 2>&1; then
+    if ! nc -z -w5 "$DEPLOY_TEST_HOST" "$DEPLOY_TEST_PORT" 2>/dev/null; then
+        echo "ERROR: Cannot connect to $DEPLOY_TEST_HOST:$DEPLOY_TEST_PORT"
+        echo "Make sure the host is reachable (Tailscale connected?)"
+        exit 1
+    fi
+    echo "Connection OK"
+else
+    echo "WARNING: 'nc' not found; skipping connectivity check"
+    echo "Ensure $DEPLOY_TEST_HOST:$DEPLOY_TEST_PORT is reachable"
 fi
-echo "Connection OK"
 echo ""
 
 # Export environment variables for tests

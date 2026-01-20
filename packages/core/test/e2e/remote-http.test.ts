@@ -59,8 +59,9 @@ describe.skipIf(!runTests)("E2E: Acceptance Tests", () => {
                 sql: `DROP TABLE IF EXISTS ${tableName}`,
                 autocommit: true,
             });
-        } catch {
-            // Ignore - table may not exist
+        } catch (e) {
+            // Expected if table wasn't created; log others for debugging
+            console.debug(`Cleanup: table '${tableName}' drop failed (may not exist):`, e);
         }
     });
 
@@ -76,8 +77,9 @@ describe.skipIf(!runTests)("E2E: Acceptance Tests", () => {
                 console.log(`Schema '${SCHEMA}' dropped`);
             } catch (e) {
                 console.error("Failed to drop schema:", e);
+            } finally {
+                await client.disconnect();
             }
-            await client.disconnect();
         }
     });
 

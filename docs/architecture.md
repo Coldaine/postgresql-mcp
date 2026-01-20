@@ -66,10 +66,12 @@ The MCP server handles concurrent connections from different coding environments
 
 | Environment | How it connects |
 |-------------|-----------------|
-| Claude Code | HTTP transport to `https://pi.tailnet.ts.net/mcp` |
+| Claude Code | HTTP transport to `https://<your-hostname>.tailnet.ts.net/mcp` |
 | VS Code + Cline | Same URL |
 | Cursor | Same URL |
 | Any MCP client | Same URL |
+
+> **Note:** Replace `<your-hostname>` with your Tailscale machine name (run `tailscale status`).
 
 ### 4. Stateful Sessions for Client Isolation
 
@@ -151,7 +153,7 @@ export PGHOST=localhost
 export PGUSER=postgres
 export PGPASSWORD=<secret>
 export PGDATABASE=postgres
-export MCP_ALLOWED_ORIGINS="https://pi.tailnet.ts.net"
+export MCP_ALLOWED_ORIGINS="https://<your-hostname>.tailnet.ts.net"
 
 # Start server
 PORT=3000 node dist/packages/core/src/server.js --transport http
@@ -168,7 +170,7 @@ Configure MCP client to use the HTTP endpoint:
 {
   "mcpServers": {
     "postgres": {
-      "url": "https://pi.tailnet.ts.net/mcp"
+      "url": "https://<your-hostname>.tailnet.ts.net/mcp"
     }
   }
 }

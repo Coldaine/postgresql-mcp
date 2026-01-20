@@ -82,9 +82,12 @@ describe.skipIf(!runTests)(describeName, () => {
         if (harness) await harness.stop();
         
         if (adminExecutor) {
-            // Cleanup: Drop the entire schema
-            await adminExecutor.execute(`DROP SCHEMA IF EXISTS ${TEST_SCHEMA} CASCADE`);
-            await adminExecutor.disconnect();
+            try {
+                // Cleanup: Drop the entire schema
+                await adminExecutor.execute(`DROP SCHEMA IF EXISTS ${TEST_SCHEMA} CASCADE`);
+            } finally {
+                await adminExecutor.disconnect();
+            }
         }
     });
 

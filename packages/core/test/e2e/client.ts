@@ -38,11 +38,17 @@ export class McpTestClient {
     }
 
     async disconnect() {
-        if (this.transport) {
-            await this.transport.close();
+        // Capture and clear references atomically to prevent double-close
+        const transport = this.transport;
+        const proc = this.process;
+        this.transport = null;
+        this.process = null;
+
+        if (transport) {
+            await transport.close();
         }
-        if (this.process) {
-            this.process.kill();
+        if (proc) {
+            proc.kill();
         }
     }
 

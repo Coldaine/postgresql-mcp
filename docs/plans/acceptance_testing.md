@@ -99,14 +99,17 @@ The MCP server maintains a session Map to route requests from different clients 
 ### Prerequisites
 
 1. MCP server deployed and running on Pi (see [Architecture](/docs/architecture.md))
-2. Server accessible via Tailscale at `https://pi.tailnet.ts.net/mcp`
+2. Server accessible via Tailscale at `https://<your-hostname>.tailnet.ts.net/mcp`
 3. PostgreSQL running locally on Pi
+
+> **Note:** Replace `<your-hostname>` with your actual Tailscale machine name (run `tailscale status` to find it).
 
 ### Run Tests
 
 ```bash
 # From dev machine (on same Tailnet)
-export MCP_TEST_URL="https://pi.tailnet.ts.net/mcp"
+# Replace <your-hostname> with your actual Tailscale machine name
+export MCP_TEST_URL="https://<your-hostname>.tailnet.ts.net/mcp"
 ./scripts/run-e2e-tests.sh
 ```
 
@@ -118,7 +121,7 @@ export PGHOST=localhost
 export PGUSER=postgres
 export PGPASSWORD=<secret>
 export PGDATABASE=postgres
-export MCP_ALLOWED_ORIGINS="https://pi.tailnet.ts.net"
+export MCP_ALLOWED_ORIGINS="https://<your-hostname>.tailnet.ts.net"
 
 # Start server
 PORT=3000 node dist/packages/core/src/server.js --transport http

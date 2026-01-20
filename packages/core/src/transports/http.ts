@@ -48,7 +48,7 @@ export async function setupHttpTransport(server: McpServer, port: number) {
                 // Session not found - client must re-initialize
                 return res.status(404).json({
                     jsonrpc: "2.0",
-                    error: { code: -32001, message: "Session not found" },
+                    error: { code: -32001, message: `Session not found: ${sessionId}` },
                     id: null
                 });
             }
