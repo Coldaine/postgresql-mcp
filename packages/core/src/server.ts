@@ -1,11 +1,12 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { PostgresExecutor } from "@pg-mcp/shared/executor/postgres.js";
-import { pgQueryHandler, PgQuerySchema } from "./tools/pg-query.js";
-import { pgSchemaHandler, PgSchemaToolSchema } from "./tools/pg-schema.js";
-import { pgAdminHandler, PgAdminToolSchema } from "./tools/pg-admin.js";
-import { pgMonitorHandler, PgMonitorToolSchema } from "./tools/pg-monitor.js";
-import { pgTxHandler, PgTxToolSchema } from "./tools/pg-tx.js";
+import { pgQueryTool } from "./tools/pg-query.js";
+import { pgSchemaTool } from "./tools/pg-schema.js";
+import { pgAdminTool } from "./tools/pg-admin.js";
+import { pgMonitorTool } from "./tools/pg-monitor.js";
+import { pgTxTool } from "./tools/pg-tx.js";
+import { setupHttpTransport } from "./transports/http.js";
 
 const server = new McpServer({
     name: "pg-mcp-core",
@@ -22,57 +23,28 @@ const executor = new PostgresExecutor({
 
 const context = { executor };
 
-server.registerTool("pg_query", {
-    description: "Execute SQL queries (read, write, explain)",
-    inputSchema: PgQuerySchema
-}, async (params) => {
-    const result = await pgQueryHandler(params, context);
-    return {
-        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
-    };
-});
+// Register all tools using the plugin pattern
+const tools = [
+    pgQueryTool,
+    pgSchemaTool,
+    pgAdminTool,
+    pgMonitorTool,
+    pgTxTool
+];
 
-server.registerTool("pg_schema", {
-    description: "Manage database structure (list, describe, create, alter, drop)",
-    inputSchema: PgSchemaToolSchema
-}, async (params) => {
-    const result = await pgSchemaHandler(params, context);
-    return {
-        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
-    };
-});
-
-server.registerTool("pg_admin", {
-    description: "Database maintenance (vacuum, analyze, reindex, stats, settings)",
-    inputSchema: PgAdminToolSchema
-}, async (params) => {
-    const result = await pgAdminHandler(params, context);
-    return {
-        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
-    };
-});
-
-server.registerTool("pg_monitor", {
-    description: "Database observability (connections, locks, size, activity, health)",
-    inputSchema: PgMonitorToolSchema
-}, async (params) => {
-    const result = await pgMonitorHandler(params, context);
-    return {
-        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
-    };
-});
-
-server.registerTool("pg_tx", {
-    description: "Transaction control (begin, commit, rollback, savepoint, release)",
-    inputSchema: PgTxToolSchema
-}, async (params) => {
-    const result = await pgTxHandler(params, context);
-    return {
-        content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
-    };
-});
-
-import { setupHttpTransport } from "./transports/http.js";
+for (const tool of tools) {
+    console.error(`[server] registering tool: ${tool.name}`);
+    server.registerTool(
+        tool.name,
+        tool.config,
+        async (params) => {
+            const result = await tool.handler(context)(params);
+            return {
+                content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+            };
+        }
+    );
+}
 
 async function main() {
     const transportType = process.argv.includes("--transport")

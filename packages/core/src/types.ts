@@ -15,3 +15,12 @@ export interface ActionHandler<T extends z.ZodTypeAny, R = any> {
 }
 
 export type ActionRegistry = Record<string, ActionHandler<any>>;
+
+export interface ToolDefinition {
+    name: string;
+    config: {
+        description: string;
+        inputSchema: z.ZodTypeAny;
+    };
+    handler: (context: ActionContext) => (params: any) => Promise<any>;
+}
