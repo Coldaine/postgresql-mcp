@@ -14,7 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Structured logging** - JSON-formatted Logger class writing to stderr (MCP-compliant)
 - **pg_admin settings action** - List, get, and set PostgreSQL configuration
 - **pg_monitor activity action** - Monitor active queries and connections
-- **HTTP/SSE transport** - Alternative to stdio for non-CLI environments
+- **Streamable HTTP transport** - MCP 2025-11-25 spec with multi-client session routing (replaces SSE)
+- **Acceptance test suite** - 10 E2E tests covering all tools via HTTP transport
+- **Deployment test suite** - Black-box tests against remote PostgreSQL
 - Inline "why" documentation throughout the codebase
 
 ### Changed
@@ -26,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Race condition in SessionManager.createSession() - session now added to map before timer starts
 - SQL injection vulnerability in settings.ts `SET` command
+- `result.fields` undefined for DDL statements (CREATE/DROP SCHEMA, etc.)
 - Unused imports removed across codebase
 
 ### Removed

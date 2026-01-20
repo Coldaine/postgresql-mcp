@@ -19,7 +19,7 @@ export class PostgresSessionExecutor implements QueryExecutor {
             
             const queryResult: QueryResult = {
                 rows: result.rows,
-                fields: result.fields.map(f => ({ name: f.name, dataTypeID: f.dataTypeID }))
+                fields: (result.fields || []).map(f => ({ name: f.name, dataTypeID: f.dataTypeID }))
             };
             
             if (result.rowCount !== null && result.rowCount !== undefined) {

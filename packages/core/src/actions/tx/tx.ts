@@ -6,6 +6,9 @@ export const TxSchema = z.object({
     action: z.enum(["begin", "commit", "rollback", "savepoint", "release", "list"]),
     session_id: z.string().optional().describe("Transaction Session ID. REQUIRED for commit, rollback, savepoint. Use the ID returned by 'begin'."),
     name: z.string().optional().describe("Savepoint identifier name"),
+    options: z.object({
+        isolation_level: z.enum(["read_uncommitted", "read_committed", "repeatable_read", "serializable"]).optional(),
+    }).optional().describe("Transaction options (only used with 'begin' action)"),
 });
 
 /**
