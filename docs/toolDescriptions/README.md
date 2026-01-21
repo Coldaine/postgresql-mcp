@@ -26,8 +26,7 @@ toolDescriptions/
 ├── pg_tx.md
 ├── pg_query.md
 ├── pg_schema.md
-├── pg_admin.md
-└── pg_transaction.md
+└── pg_admin.md
 ```
 
 ## Required Sections Per Tool

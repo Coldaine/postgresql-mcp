@@ -12,11 +12,18 @@
 
 set -euo pipefail
 
+# Determine if the script is being sourced or executed
+if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+    EXIT_CMD="return"
+else
+    EXIT_CMD="exit"
+fi
+
 # Check if bws is installed
 if ! command -v bws &> /dev/null; then
     echo "Error: Bitwarden Secrets CLI (bws) not found. Install from:"
     echo "  https://github.com/bitwarden/sdk/releases"
-    exit 1
+    $EXIT_CMD 1
 fi
 
 # Check if BWS_ACCESS_TOKEN is set
@@ -24,7 +31,7 @@ if [[ -z "${BWS_ACCESS_TOKEN:-}" ]]; then
     echo "Error: BWS_ACCESS_TOKEN environment variable not set."
     echo "Create a machine account and access token at:"
     echo "  https://vault.bitwarden.com/"
-    exit 1
+    $EXIT_CMD 1
 fi
 
 # Fetch PostgreSQL password from Bitwarden Secrets Manager
