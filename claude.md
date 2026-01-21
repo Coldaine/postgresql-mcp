@@ -1,4 +1,4 @@
-# Claude Code Instructions
+# Claude Code Instructions for ColdQuery
 
 See [INSTRUCTIONS.md](INSTRUCTIONS.md) for agent instructions.
 

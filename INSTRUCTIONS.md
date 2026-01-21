@@ -61,7 +61,7 @@ For detailed architecture, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 2. **Schema-Based Write Detection**: Tool schema declares if operation is a write, not SQL parsing
 3. **30-Minute TTL**: Sessions expire after 30 min of inactivity
 4. **Destructive Cleanup**: Connections destroyed on session close, not returned to pool
-5. **curried Handlers**: `handler: (context) => (params) => result` for testability
+5. **Curried Handlers**: `handler: (context) => (params) => result` for testability
 
 ## Documentation Standards
 

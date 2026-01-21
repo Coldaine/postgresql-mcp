@@ -1,4 +1,4 @@
-# Gemini Instructions
+# Gemini Instructions for ColdQuery
 
 See [INSTRUCTIONS.md](INSTRUCTIONS.md) for agent instructions.
 
