@@ -1,0 +1,14 @@
+node_modules
+dist
+.git
+.github
+*.md
+!README.md
+test-database
+_comparison
+.vscode
+*.log
+.env*
+!.env.example
+coverage
+.nyc_output
