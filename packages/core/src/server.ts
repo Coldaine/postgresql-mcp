@@ -60,14 +60,16 @@ for (const tool of tools) {
 
     const { description, inputSchema, readOnlyHint, destructiveHint } = tool.config;
 
+    const annotations: { readOnlyHint?: boolean; destructiveHint?: boolean } = {};
+    if (readOnlyHint !== undefined) annotations.readOnlyHint = readOnlyHint;
+    if (destructiveHint !== undefined) annotations.destructiveHint = destructiveHint;
+
     server.registerTool(
         tool.name,
         {
             description,
             inputSchema,
-            ...(readOnlyHint !== undefined || destructiveHint !== undefined
-                ? { annotations: { readOnlyHint, destructiveHint } }
-                : {}),
+            ...(Object.keys(annotations).length > 0 ? { annotations } : {}),
         },
         async (params) => {
             const rawResult = await tool.handler(context)(params);

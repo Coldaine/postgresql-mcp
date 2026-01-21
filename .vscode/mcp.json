@@ -8,7 +8,6 @@
                 "PGHOST": "localhost",
                 "PGPORT": "5433",
                 "PGUSER": "mcp",
-                "PGPASSWORD": "mcp",
                 "PGDATABASE": "mcp_test"
             }
         }
