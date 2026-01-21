@@ -17,9 +17,11 @@ RUN addgroup -g 1001 coldquery && \
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY packages/core/package.json ./packages/core/
-COPY shared/package.json ./shared/
+COPY shared/ ./shared/
 RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=builder /app/dist ./dist
+# Copy compiled shared module to node_modules (workspace symlink points to source, not compiled)
+COPY --from=builder /app/dist/shared ./node_modules/@pg-mcp/shared
 RUN chown -R coldquery:coldquery /app
 USER coldquery
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

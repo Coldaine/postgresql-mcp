@@ -92,10 +92,11 @@ export async function setupHttpTransport(server: McpServer, port: number) {
         });
     });
 
-    app.listen(port, "127.0.0.1", () => {
-        Logger.info(`ColdQuery HTTP Server running on http://127.0.0.1:${port}`);
-        Logger.info(`MCP endpoint: http://127.0.0.1:${port}/mcp`);
-        Logger.info(`Health check: http://127.0.0.1:${port}/health`);
+    const host = process.env['HOST'] || "0.0.0.0";
+    app.listen(port, host, () => {
+        Logger.info(`ColdQuery HTTP Server running on http://${host}:${port}`);
+        Logger.info(`MCP endpoint: http://${host}:${port}/mcp`);
+        Logger.info(`Health check: http://${host}:${port}/health`);
         if (allowedOrigins) {
             Logger.info(`Allowed origins: ${allowedOrigins.join(", ")}`);
         } else {
