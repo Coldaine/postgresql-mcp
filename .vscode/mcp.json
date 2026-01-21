@@ -8,6 +8,7 @@
                 "PGHOST": "localhost",
                 "PGPORT": "5433",
                 "PGUSER": "mcp",
+                "PGPASSWORD": "${env:PGPASSWORD}",
                 "PGDATABASE": "mcp_test"
             }
         }
