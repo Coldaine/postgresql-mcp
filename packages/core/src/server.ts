@@ -11,11 +11,7 @@ import { pgTxTool } from "./tools/pg-tx.js";
 import { setupHttpTransport } from "./transports/http.js";
 import { wrapResponse } from "./middleware/session-echo.js";
 
-const server = new McpServer({
-    name: "coldquery",
-    version: "0.2.0",
-});
-
+// Global singleton helper to allow tool handlers to access DB
 const executor = new PostgresExecutor({
     host: process.env['PGHOST'] || "localhost",
     port: parseInt(process.env['PGPORT'] || "5432"),
@@ -55,30 +51,38 @@ const tools = [
     pgTxTool
 ];
 
-for (const tool of tools) {
-    Logger.info(`registering tool: ${tool.name}`);
+export function createMcpServer() {
+    const server = new McpServer({
+        name: "coldquery",
+        version: "0.2.0",
+    });
 
-    const { description, inputSchema, readOnlyHint, destructiveHint } = tool.config;
+    for (const tool of tools) {
+        Logger.info(`registering tool: ${tool.name}`);
 
-    const annotations: { readOnlyHint?: boolean; destructiveHint?: boolean } = {};
-    if (readOnlyHint !== undefined) annotations.readOnlyHint = readOnlyHint;
-    if (destructiveHint !== undefined) annotations.destructiveHint = destructiveHint;
+        const { description, inputSchema, readOnlyHint, destructiveHint } = tool.config;
 
-    server.registerTool(
-        tool.name,
-        {
-            description,
-            inputSchema,
-            ...(Object.keys(annotations).length > 0 ? { annotations } : {}),
-        },
-        async (params) => {
-            const rawResult = await tool.handler(context)(params);
-            const result = wrapResponse(rawResult, params, tool.name, sessionManager);
-            return {
-                content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
-            };
-        }
-    );
+        const annotations: { readOnlyHint?: boolean; destructiveHint?: boolean } = {};
+        if (readOnlyHint !== undefined) annotations.readOnlyHint = readOnlyHint;
+        if (destructiveHint !== undefined) annotations.destructiveHint = destructiveHint;
+
+        server.registerTool(
+            tool.name,
+            {
+                description,
+                inputSchema,
+                ...(Object.keys(annotations).length > 0 ? { annotations } : {}),
+            },
+            async (params) => {
+                const rawResult = await tool.handler(context)(params);
+                const result = wrapResponse(rawResult, params, tool.name, sessionManager);
+                return {
+                    content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+                };
+            }
+        );
+    }
+    return server;
 }
 
 async function main() {
@@ -88,8 +92,9 @@ async function main() {
 
     if (transportType === "sse" || transportType === "http") {
         const port = parseInt(process.env['PORT'] || "3000");
-        await setupHttpTransport(server, port);
+        await setupHttpTransport(port);
     } else {
+        const server = createMcpServer();
         const transport = new StdioServerTransport();
         await server.connect(transport);
         Logger.info("ColdQuery running on stdio");

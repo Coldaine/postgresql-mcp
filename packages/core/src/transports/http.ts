@@ -4,6 +4,7 @@ import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import express, { Request, Response } from "express";
 import { randomUUID } from "crypto";
 import { Logger } from "../logger.js";
+import { createMcpServer } from "../server.js";
 
 /**
  * Session Management for Multi-Client Access
@@ -30,7 +31,7 @@ function getAllowedOrigins(): string[] | undefined {
     return origins.split(',').map(s => s.trim()).filter(Boolean);
 }
 
-export async function setupHttpTransport(server: McpServer, port: number) {
+export async function setupHttpTransport(port: number) {
     const app = express();
     app.use(express.json());
 
@@ -78,6 +79,7 @@ export async function setupHttpTransport(server: McpServer, port: number) {
             }
         };
 
+        const server = createMcpServer();
         // Cast needed: StreamableHTTPServerTransport implements Transport but SDK types don't reflect this
         await server.connect(transport as Transport);
         return transport.handleRequest(req, res, req.body);
