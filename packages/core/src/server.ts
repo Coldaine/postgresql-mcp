@@ -12,7 +12,7 @@ import { setupHttpTransport } from "./transports/http.js";
 import { wrapResponse } from "./middleware/session-echo.js";
 
 const server = new McpServer({
-    name: "pg-mcp-core",
+    name: "coldquery",
     version: "0.2.0",
 });
 
@@ -81,7 +81,7 @@ async function main() {
     } else {
         const transport = new StdioServerTransport();
         await server.connect(transport);
-        Logger.info("PostgreSQL MCP Server running on stdio");
+        Logger.info("ColdQuery running on stdio");
     }
 }
 
