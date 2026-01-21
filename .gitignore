@@ -41,3 +41,6 @@ temp/
 # Keep package-lock.json, ignore other lock files
 yarn.lock
 pnpm-lock.yaml
+
+# Reference comparisons
+_comparison/
