@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "coldquery": {
+      "type": "http",
+      "url": "http://100.65.198.61:19002/mcp"
+    }
+  }
+}
