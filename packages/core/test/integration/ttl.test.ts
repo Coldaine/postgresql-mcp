@@ -23,6 +23,9 @@ describe("Session TTL Tests", { timeout: 10000 }, () => {
     });
 
     it("should auto-rollback and close session on TTL expiration", async () => {
+        // Cleanup leftover table if it exists
+        await executor.execute("DROP TABLE IF EXISTS ttl_test");
+
         await pgSchemaHandler({
             action: "create",
             target: "table",

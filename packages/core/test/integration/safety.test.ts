@@ -44,6 +44,9 @@ describe("Safety & Reliability Tests", { timeout: 15000 }, () => {
     });
 
     it("should maintain transaction isolation between sessions", async () => {
+        // Cleanup leftover table if it exists
+        await executor.execute("DROP TABLE IF EXISTS isolation_test");
+
         // Create a table for isolation test
         await pgSchemaHandler({
             action: "create",
