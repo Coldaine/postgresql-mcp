@@ -11,6 +11,10 @@
         "forceConsistentCasingInFileNames": true
     },
     "include": [
-        "src/**/*"
+        "executor/**/*.ts",
+        "security/**/*.ts"
+    ],
+    "exclude": [
+        "dist"
     ]
 }
