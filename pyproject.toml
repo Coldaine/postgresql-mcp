@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "coldquery"
+version = "0.3.0"
+description = "FastMCP 3.0 Refactor of ColdQuery"
+requires-python = ">=3.11"
+dependencies = [
+    "fastmcp>=3.0.0b1",
+    "asyncpg",
+    "python-dotenv",
+    "pydantic",
+    "httpx<1.0"
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "pytest-asyncio"
+]
+
+[tool.setuptools]
+packages = ["coldquery", "coldquery.core", "coldquery.tools", "coldquery.utils"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
