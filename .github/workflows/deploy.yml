@@ -50,6 +50,10 @@ jobs:
         run: |
           gzip -c image.tar | ssh ${{ env.PI_USER }}@${{ env.PI_HOST }} 'gunzip | docker load'
 
+      - name: Prepare deployment directory
+        run: |
+          ssh ${{ env.PI_USER }}@${{ env.PI_HOST }} 'mkdir -p ~/coldquery'
+
       - name: Copy docker-compose.deploy.yml
         run: |
           scp docker-compose.deploy.yml ${{ env.PI_USER }}@${{ env.PI_HOST }}:~/coldquery/docker-compose.yml
