@@ -7,6 +7,9 @@ import { pgSchemaHandler, PgSchemaToolSchema } from "./tools/pg-schema.js";
 import { pgAdminHandler, PgAdminToolSchema } from "./tools/pg-admin.js";
 import { pgMonitorHandler, PgMonitorToolSchema } from "./tools/pg-monitor.js";
 import { pgTxHandler, PgTxToolSchema } from "./tools/pg-tx.js";
+import { getPgSchemaResources, getPgSchemaResourceTemplates } from "./resources/pg-schema.js";
+import { getPgMonitorResources } from "./resources/pg-monitor.js";
+import { analyzeQueryPrompt } from "./prompts/query-gen.js";
 import type { ActionContext } from "./types.js";
 import { wrapResponse } from "./middleware/session-echo.js";
 
@@ -46,6 +49,14 @@ Available tools:
 
 Safety: Write operations require explicit session_id or autocommit:true.`,
 });
+
+// Register Resources
+server.addResources(getPgSchemaResources(actionContext));
+server.addResourceTemplates(getPgSchemaResourceTemplates(actionContext));
+server.addResources(getPgMonitorResources(actionContext));
+
+// Register Prompts
+server.addPrompt(analyzeQueryPrompt);
 
 // Register pg_query tool
 server.addTool({
