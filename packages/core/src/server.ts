@@ -8,6 +8,7 @@ import { pgAdminHandler, PgAdminToolSchema } from "./tools/pg-admin.js";
 import { pgMonitorHandler, PgMonitorToolSchema } from "./tools/pg-monitor.js";
 import { pgTxHandler, PgTxToolSchema } from "./tools/pg-tx.js";
 import type { ActionContext } from "./types.js";
+import { wrapResponse } from "./middleware/session-echo.js";
 
 /**
  * FastMCP Migration - Server Entry Point
@@ -63,7 +64,8 @@ Without session_id or autocommit:true, writes will fail with a safety error.`,
     annotations: { destructiveHint: true },
     execute: async (params) => {
         const result = await pgQueryHandler(params, actionContext);
-        return JSON.stringify(result, null, 2);
+        const wrappedResult = wrapResponse(result, params, "pg_query", sessionManager);
+        return JSON.stringify(wrappedResult, null, 2);
     },
 });
 
@@ -84,7 +86,8 @@ Safety: create/alter/drop are destructive and require explicit confirmation.`,
     annotations: { destructiveHint: true },
     execute: async (params) => {
         const result = await pgSchemaHandler(params, actionContext);
-        return JSON.stringify(result, null, 2);
+        const wrappedResult = wrapResponse(result, params, "pg_schema", sessionManager);
+        return JSON.stringify(wrappedResult, null, 2);
     },
 });
 
@@ -103,7 +106,8 @@ Actions:
     annotations: { destructiveHint: true },
     execute: async (params) => {
         const result = await pgAdminHandler(params, actionContext);
-        return JSON.stringify(result, null, 2);
+        const wrappedResult = wrapResponse(result, params, "pg_admin", sessionManager);
+        return JSON.stringify(wrappedResult, null, 2);
     },
 });
 
@@ -122,7 +126,8 @@ Actions:
     annotations: { readOnlyHint: true },
     execute: async (params) => {
         const result = await pgMonitorHandler(params, actionContext);
-        return JSON.stringify(result, null, 2);
+        const wrappedResult = wrapResponse(result, params, "pg_monitor", sessionManager);
+        return JSON.stringify(wrappedResult, null, 2);
     },
 });
 
@@ -141,7 +146,8 @@ Actions:
     parameters: PgTxToolSchema,
     execute: async (params) => {
         const result = await pgTxHandler(params, actionContext);
-        return JSON.stringify(result, null, 2);
+        const wrappedResult = wrapResponse(result, params, "pg_tx", sessionManager);
+        return JSON.stringify(wrappedResult, null, 2);
     },
 });
 
