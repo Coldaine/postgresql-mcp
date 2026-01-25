@@ -82,6 +82,18 @@ Each coding environment gets its own MCP session:
 
 ---
 
+## FastMCP Components
+
+ColdQuery adopts the **FastMCP 3.0** architectural patterns, organizing capabilities into three primitives:
+
+1.  **Tools:** Executable functions that perform actions (e.g., `pg_query`, `pg_schema`).
+2.  **Resources:** Passive data sources that provide context (e.g., `postgres://schema`).
+3.  **Prompts:** Pre-defined templates that guide the LLM (e.g., `analyze_query`).
+
+This separation allows for a more "agentic" workflow where the LLM can read context via resources before deciding to act via tools.
+
+---
+
 ## Executor Interface Pattern
 
 **Location:** `shared/executor/`

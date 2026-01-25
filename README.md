@@ -36,6 +36,18 @@ npm test
 | `pg_tx` | Transaction control | `begin`, `commit`, `rollback`, `savepoint`, `release`, `list` |
 | `pg_monitor` | Observability | `health`, `activity`, `connections`, `locks`, `size` |
 
+## Available Resources
+
+| URI | Name | Description |
+|-----|------|-------------|
+| `postgres://schema` | Database Schema | JSON representation of all tables in the public schema |
+
+## Available Prompts
+
+| Name | Description | Arguments |
+|------|-------------|-----------|
+| `analyze_query` | Analyze SQL Query | `query` (string) |
+
 ## Transactional Safety Guide
 
 The **Default-Deny** policy prevents silent failures where an AI agent intends to use a transaction but forgets the `session_id`.
