@@ -8,28 +8,32 @@ from typing import AsyncGenerator
 from coldquery.core.context import ActionContext
 from coldquery.core.executor import AsyncpgPoolExecutor
 from coldquery.core.session import SessionManager
+from coldquery.config import get_settings
 
 # --- Real Database Fixtures ---
 
 @pytest.fixture(scope="session")
-async def real_db_pool() -> AsyncGenerator[asyncpg.Pool, None]:
+async def db_settings():
+    """Load database settings from environment variables."""
+    return get_settings()
+
+@pytest.fixture(scope="session")
+async def real_db_pool(db_settings) -> AsyncGenerator[asyncpg.Pool, None]:
     """Create and tear down a real asyncpg connection pool."""
     pool = await asyncpg.create_pool(
-        host=os.environ.get("DB_HOST", "localhost"),
-        port=int(os.environ.get("DB_PORT", "5433")),
-        user=os.environ.get("DB_USER", "mcp"),
-        password=os.environ.get("DB_PASSWORD", "mcp"),
-        database=os.environ.get("DB_DATABASE", "mcp_test"),
+        user=db_settings.db_user,
+        password=db_settings.db_password.get_secret_value(),
+        database=db_settings.db_database,
+        host=db_settings.db_host,
+        port=db_settings.db_port,
     )
     yield pool
     await pool.close()
 
 @pytest.fixture
-async def real_executor() -> AsyncGenerator[AsyncpgPoolExecutor, None]:
+async def real_executor(real_db_pool: asyncpg.Pool) -> AsyncpgPoolExecutor:
     """Fixture for a real database executor."""
-    executor = AsyncpgPoolExecutor()
-    yield executor
-    await executor.disconnect()
+    return AsyncpgPoolExecutor(real_db_pool)
 
 @pytest.fixture
 async def real_session_manager(real_executor: AsyncpgPoolExecutor) -> SessionManager:

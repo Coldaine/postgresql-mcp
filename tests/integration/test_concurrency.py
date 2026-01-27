@@ -14,7 +14,7 @@ async def test_multiple_sessions_can_run_concurrently(real_context: ActionContex
     """Verify that two separate sessions can begin, run, and commit concurrently."""
     # Create a table for this test
     await real_context.executor.execute(
-        "CREATE TABLE concurrency_test (id INT)"
+        "CREATE TABLE concurrency_test (id INT)", autocommit=True
     )
 
     # Begin two sessions
@@ -22,7 +22,7 @@ async def test_multiple_sessions_can_run_concurrently(real_context: ActionContex
     session_b_id = json.loads(await pg_tx(action="begin", context=real_context))["session_id"]
 
     assert session_a_id != session_b_id
-    assert len(real_context.session_manager.get_all_sessions()) == 2
+    assert len(real_context.session_manager.list_sessions()) == 2
 
     # Use both sessions
     await real_context.session_manager.get_session_executor(session_a_id).execute(
@@ -39,7 +39,7 @@ async def test_multiple_sessions_can_run_concurrently(real_context: ActionContex
     # Verify results
     result = await real_context.executor.execute("SELECT COUNT(*) FROM concurrency_test")
     assert result.rows[0]["count"] == 2
-    assert len(real_context.session_manager.get_all_sessions()) == 0
+    assert len(real_context.session_manager.list_sessions()) == 0
 
 
 @pytest.mark.asyncio
@@ -52,7 +52,7 @@ async def test_max_sessions_limit_is_enforced(real_context: ActionContext):
         session_id = json.loads(await pg_tx(action="begin", context=real_context))["session_id"]
         session_ids.append(session_id)
 
-    assert len(real_context.session_manager.get_all_sessions()) == MAX_SESSIONS
+    assert len(real_context.session_manager.list_sessions()) == MAX_SESSIONS
 
     # The next attempt to create a session should fail
     with pytest.raises(RuntimeError, match="Maximum number of concurrent sessions reached"):
@@ -62,4 +62,4 @@ async def test_max_sessions_limit_is_enforced(real_context: ActionContext):
     for session_id in session_ids:
         await pg_tx(action="commit", session_id=session_id, context=real_context)
 
-    assert len(real_context.session_manager.get_all_sessions()) == 0
+    assert len(real_context.session_manager.list_sessions()) == 0

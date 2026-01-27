@@ -66,4 +66,4 @@ async def test_closing_session_releases_connection(
 
     # The connection should be released back to the pool
     assert real_db_pool.get_idle_size() == initial_idle_conns
-    assert len(real_context.session_manager.get_all_sessions()) == 0
+    assert len(real_context.session_manager.list_sessions()) == 0

@@ -58,7 +58,8 @@ class SessionManager:
         if session_data:
             if session_data.ttl_timer:
                 session_data.ttl_timer.cancel()
-            await session_data.executor.disconnect(destroy=True)
+            # The connection will be released back to the pool, not destroyed.
+            await session_data.executor.disconnect(destroy=False)
             logger.info(f"Session closed: {session_id}")
 
     def _reset_ttl(self, session_id: str) -> None:

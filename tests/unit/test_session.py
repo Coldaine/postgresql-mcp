@@ -52,7 +52,7 @@ async def test_close_session(mock_pool_executor):
 
     await session_manager.close_session(session_id)
     assert len(session_manager._sessions) == 0
-    mock_session_executor.disconnect.assert_awaited_once_with(destroy=True)
+    mock_session_executor.disconnect.assert_awaited_once_with(destroy=False)
 
 @pytest.mark.asyncio
 async def test_session_expiry(mock_pool_executor):
