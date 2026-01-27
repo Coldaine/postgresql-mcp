@@ -163,14 +163,14 @@ async def test_pg_query_tool_dispatches_to_correct_handler():
     )
     mock_session_manager.get_session_executor.return_value = mock_executor
     mock_executor.execute.side_effect = None
-    await pg_query(action="read", sql="SELECT 1", mcp_context=mock_context)
+    await pg_query(action="read", sql="SELECT 1", context=mock_context)
     mock_executor.execute.assert_called_once_with("SELECT 1", None)
 
 
 @pytest.mark.asyncio
 async def test_pg_query_tool_unknown_action():
     with pytest.raises(ValueError, match="Unknown action: foo"):
-        await pg_query(action="foo", sql="SELECT 1", mcp_context=mock_context)
+        await pg_query(action="foo", sql="SELECT 1", context=mock_context)
 
 
 @pytest.mark.asyncio
