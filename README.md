@@ -286,17 +286,27 @@ QUERY_ACTIONS = {
 
 ## Docker Deployment
 
-Build and run with Docker:
+### Local Development
 
 ```bash
-# Build image
-docker build -t coldquery:latest .
+# Start services
+docker-compose up -d
 
-# Run container
-docker run -p 3000:3000 \
-  -e DB_HOST=host.docker.internal \
-  -e DB_PORT=5433 \
-  coldquery:latest
+# View logs
+docker-compose logs -f coldquery
+
+# Stop services
+docker-compose down
+```
+
+### Production
+
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for production deployment guide.
+
+Build for ARM64 (Raspberry Pi):
+
+```bash
+docker buildx build --platform linux/arm64 -t coldquery:arm64 .
 ```
 
 ## License

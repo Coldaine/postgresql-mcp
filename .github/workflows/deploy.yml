@@ -3,96 +3,119 @@ name: Deploy to Raspberry Pi
 on:
   push:
     branches: [main]
+    paths:
+      - 'coldquery/**'
+      - 'Dockerfile'
+      - 'docker-compose.deploy.yml'
   workflow_dispatch:
-
-env:
-  IMAGE_NAME: coldquery
-  PI_HOST: 100.65.198.61
-  PI_USER: coldaine
 
 jobs:
   build-and-deploy:
+    name: Build and Push Multi-Arch Image
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
+        with:
+          platforms: amd64,arm64
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build ARM64 image
-        run: |
-          docker buildx build \
-            --platform linux/arm64 \
-            --tag ${{ env.IMAGE_NAME }}:${{ github.sha }} \
-            --tag ${{ env.IMAGE_NAME }}:latest \
-            --output type=docker,dest=image.tar \
-            .
-
-      - name: Connect to Tailscale
-        uses: tailscale/github-action@v3
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
         with:
-          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-          tags: tag:ci
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/coldaine/coldquery:latest
+            ghcr.io/coldaine/coldquery:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to Raspberry Pi
+    needs: build-and-deploy
+    runs-on: ubuntu-latest
+    env:
+      PI_HOST: ${{ secrets.PI_HOST }}
+      PI_USER: ${{ secrets.PI_USER }}
+
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Set up SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.PI_SSH_KEY }}
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.PI_SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H ${{ env.PI_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          ssh-keyscan -H "$PI_HOST" >> ~/.ssh/known_hosts
 
-      - name: Transfer image to Pi
+      - name: Deploy on Raspberry Pi
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_DATABASE: ${{ secrets.DB_DATABASE }}
+          TS_AUTHKEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gzip -c image.tar | ssh ${{ env.PI_USER }}@${{ env.PI_HOST }} 'gunzip | docker load'
+          ssh -i ~/.ssh/id_ed25519 "$PI_USER@$PI_HOST" << 'EOF'
+            set -e
 
-      - name: Prepare deployment directory
-        run: |
-          ssh ${{ env.PI_USER }}@${{ env.PI_HOST }} 'mkdir -p ~/coldquery'
+            # Login to GHCR
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
 
-      - name: Copy docker-compose.deploy.yml
-        run: |
-          scp docker-compose.deploy.yml ${{ env.PI_USER }}@${{ env.PI_HOST }}:~/coldquery/docker-compose.yml
+            # Deployment directory
+            DEPLOY_DIR="/opt/coldquery"
+            mkdir -p "$DEPLOY_DIR"
+            cd "$DEPLOY_DIR"
 
-      - name: Deploy with Docker Compose
-        run: |
-          ssh ${{ env.PI_USER }}@${{ env.PI_HOST }} <<EOF
-            cd ~/coldquery
+            # Create docker-compose.yml
+            cat > docker-compose.deploy.yml << 'COMPOSE_EOF'
+            ${{ toJSON(fromJSON(readFile('docker-compose.deploy.yml'))) }}
+            COMPOSE_EOF
 
-            # Export secrets as env vars
-            export TAILSCALE_AUTH_KEY=${{ secrets.TAILSCALE_AUTH_KEY }}
-            export PGPASSWORD=${{ secrets.PI_POSTGRES_PASSWORD }}
+            # Create .env file
+            cat > .env << ENVEOF
+            DB_HOST=$DB_HOST
+            DB_PORT=$DB_PORT
+            DB_USER=$DB_USER
+            DB_PASSWORD=$DB_PASSWORD
+            DB_DATABASE=$DB_DATABASE
+            TS_AUTHKEY=$TS_AUTHKEY
+            ENVEOF
 
-            # Login to Docker (if needed, but we used load)
+            # Pull new image and restart
+            docker-compose -f docker-compose.deploy.yml pull
+            docker-compose -f docker-compose.deploy.yml up -d
 
-            # Start services
-            docker-compose down
-            docker-compose up -d
-
-            # Wait for container to be healthy
             echo "Waiting for health check..."
-            # Note: Health check inside the container might still refer to localhost:3000
             for i in {1..30}; do
-              if docker exec coldquery wget --no-verbose --tries=1 --spider http://localhost:3000/health 2>/dev/null; then
-                echo "Container is healthy!"
+              if docker container inspect coldquery-server --format '{{.State.Health.Status}}' | grep -q "healthy"; then
+                echo "✅ Deployment successful and container is healthy!"
                 exit 0
               fi
-              echo "Attempt \$i/30 - waiting..."
-              sleep 2
+              echo "Attempt $i/30: waiting for container to become healthy..."
+              sleep 5
             done
-            echo "Health check failed"
-            docker logs coldquery
+
+            echo "🚨 Health check failed after 150 seconds."
+            docker logs coldquery-server
             exit 1
           EOF
-
-      - name: Cleanup old images on Pi
-        run: |
-          ssh ${{ env.PI_USER }}@${{ env.PI_HOST }} 'docker image prune -f'
-
-      - name: Cleanup local artifacts
-        if: always()
-        run: rm -f image.tar ~/.ssh/id_ed25519
