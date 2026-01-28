@@ -1,0 +1,41 @@
+services:
+  tailscale:
+    image: tailscale/tailscale:latest
+    container_name: coldquery-tailscale
+    hostname: coldquery-server
+    environment:
+      - TS_AUTHKEY=${TS_AUTHKEY}
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_EXTRA_ARGS=--advertise-tags=tag:server
+    volumes:
+      - tailscale_data:/var/lib/tailscale
+      - /dev/net/tun:/dev/net/tun
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    restart: unless-stopped
+    network_mode: host
+
+  coldquery:
+    image: ghcr.io/coldaine/coldquery:latest
+    container_name: coldquery-server
+    environment:
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_DATABASE: ${DB_DATABASE}
+      HOST: 0.0.0.0
+      PORT: 3000
+    network_mode: service:tailscale
+    depends_on:
+      - tailscale
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  tailscale_data:

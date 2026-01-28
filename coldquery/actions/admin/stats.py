@@ -1,8 +1,6 @@
 import json
 from typing import Dict, Any
-from coldquery.core.context import ActionContext
-from coldquery.core.executor import resolve_executor
-from coldquery.security.identifiers import sanitize_identifier
+from coldquery.core.context import ActionContext, resolve_executor
 
 async def stats_handler(params: Dict[str, Any], context: ActionContext) -> str:
     """Get table statistics."""
@@ -28,4 +26,4 @@ async def stats_handler(params: Dict[str, Any], context: ActionContext) -> str:
     """
 
     result = await executor.execute(sql, [table, schema])
-    return json.dumps(result.to_dict())
+    return json.dumps(result.to_dict(), default=str)

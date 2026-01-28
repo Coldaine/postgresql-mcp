@@ -1,7 +1,6 @@
 import json
 from typing import Dict, Any
-from coldquery.core.context import ActionContext
-from coldquery.core.executor import resolve_executor
+from coldquery.core.context import ActionContext, resolve_executor
 
 async def describe_handler(params: Dict[str, Any], context: ActionContext) -> str:
     """Describe table structure."""
@@ -44,4 +43,4 @@ async def describe_handler(params: Dict[str, Any], context: ActionContext) -> st
         "indexes": indexes.rows,
     }
 
-    return json.dumps(result)
+    return json.dumps(result, default=str)
