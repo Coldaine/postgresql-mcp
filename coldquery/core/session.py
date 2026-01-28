@@ -12,10 +12,19 @@ SESSION_TTL_MINUTES = 30
 MAX_SESSIONS = 10
 
 class SessionData:
-    def __init__(self, executor: QueryExecutor):
+    def __init__(self, session_id: str, executor: QueryExecutor):
+        self.id = session_id
         self.executor = executor
+        self.created_at = datetime.now(timezone.utc)
         self.last_accessed = datetime.now(timezone.utc)
         self.ttl_timer: Optional[asyncio.TimerHandle] = None
+
+    @property
+    def expires_in(self) -> float:
+        """Minutes until session expires."""
+        expiry_time = self.last_accessed + timedelta(minutes=SESSION_TTL_MINUTES)
+        remaining = (expiry_time - datetime.now(timezone.utc)).total_seconds() / 60
+        return max(0, remaining)
 
 class SessionManager:
     def __init__(self, pool_executor: QueryExecutor):
@@ -36,7 +45,7 @@ class SessionManager:
                 await session_executor.disconnect(destroy=True)
                 raise RuntimeError("Maximum number of concurrent sessions reached.")
 
-            session_data = SessionData(session_executor)
+            session_data = SessionData(session_id, session_executor)
             self._sessions[session_id] = session_data
             self._reset_ttl(session_id)
             logger.info(f"Session created: {session_id}")
@@ -44,6 +53,10 @@ class SessionManager:
         except Exception as e:
             logger.error(f"Failed to create session: {e}")
             raise
+
+    def get_session(self, session_id: str) -> Optional[SessionData]:
+        """Get session data by ID without resetting TTL."""
+        return self._sessions.get(session_id)
 
     def get_session_executor(self, session_id: str) -> Optional[QueryExecutor]:
         session_data = self._sessions.get(session_id)

@@ -27,9 +27,9 @@ async def settings_handler(params: Dict[str, Any], context: ActionContext) -> st
         safe_setting_name = sanitize_identifier(setting_name)
         sql = f"SHOW {safe_setting_name}"
         result = await executor.execute(sql)
-        return json.dumps(result.to_dict())
+        return json.dumps(result.to_dict(), default=str)
     else:
         # Show all settings
         sql = "SELECT name, setting, category, short_desc FROM pg_settings"
         result = await executor.execute(sql)
-        return json.dumps(result.to_dict())
+        return json.dumps(result.to_dict(), default=str)

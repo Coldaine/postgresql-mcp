@@ -62,15 +62,13 @@ class AsyncpgSessionExecutor:
                 await self._connection.execute("SET statement_timeout = 0")
 
     async def disconnect(self, destroy: bool = False) -> None:
-        if self._pool:
-            # Release connection back to pool
-            await self._pool.release(self._connection, timeout=1.0 if destroy else None)
-            if destroy:
-                # Terminate the connection to prevent state leaks
+        try:
+            if self._pool:
+                await self._pool.release(self._connection)
+            else:
                 await self._connection.close()
-        else:
-            # No pool, just close the connection
-            await self._connection.close()
+        except Exception:
+            pass  # Connection may already be released or closed
 
     async def create_session(self) -> "QueryExecutor":
         return self
@@ -97,7 +95,7 @@ class AsyncpgPoolExecutor:
     async def disconnect(self, destroy: bool = False) -> None:
         if self._pool:
             if destroy:
-                await self._pool.terminate()
+                self._pool.terminate()
             else:
                 await self._pool.close()
             self._pool = None

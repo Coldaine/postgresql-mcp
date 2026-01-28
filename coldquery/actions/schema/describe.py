@@ -43,4 +43,4 @@ async def describe_handler(params: Dict[str, Any], context: ActionContext) -> st
         "indexes": indexes.rows,
     }
 
-    return json.dumps(result)
+    return json.dumps(result, default=str)

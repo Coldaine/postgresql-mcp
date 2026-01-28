@@ -26,4 +26,4 @@ async def stats_handler(params: Dict[str, Any], context: ActionContext) -> str:
     """
 
     result = await executor.execute(sql, [table, schema])
-    return json.dumps(result.to_dict())
+    return json.dumps(result.to_dict(), default=str)

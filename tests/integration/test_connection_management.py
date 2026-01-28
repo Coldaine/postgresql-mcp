@@ -30,7 +30,7 @@ async def test_session_connections_are_separate_from_pool(
     real_context: ActionContext, real_db_pool: asyncpg.Pool
 ):
     """Verify that creating a session acquires a new connection, not from the idle pool."""
-    initial_idle_conns = real_db_pool.get_idle_size()
+    initial_idle_conns = real_db_pool.get_idle_size()  # noqa: F841 - TODO: wire up assertion
 
     # Begin a transaction, which creates a session
     begin_result = await pg_tx(action="begin", context=real_context)
@@ -45,7 +45,7 @@ async def test_session_connections_are_separate_from_pool(
     # but the pool itself might not show it as "idle". A better test is to check if
     # the session is active.
 
-    assert real_context.session_manager.get_session(session_id) is not None
+    assert real_context.session_manager.get_session_executor(session_id) is not None
 
     await pg_tx(action="commit", session_id=session_id, context=real_context)
 
@@ -66,4 +66,4 @@ async def test_closing_session_releases_connection(
 
     # The connection should be released back to the pool
     assert real_db_pool.get_idle_size() == initial_idle_conns
-    assert len(real_context.session_manager.get_all_sessions()) == 0
+    assert len(real_context.session_manager.list_sessions()) == 0

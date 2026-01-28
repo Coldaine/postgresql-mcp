@@ -1,34 +1,18 @@
 """
 Integration test fixtures for ColdQuery with REAL PostgreSQL database.
 
-KNOWN ISSUES (Tests Currently Failing):
----------------------------------------
-These integration tests are INTENTIONALLY FAILING due to async/event loop bugs
-that need to be fixed. They are committed to main to make the technical debt
-visible and trackable.
+Requires PostgreSQL running on localhost:5433 (docker compose up -d postgres).
 
-Root Causes:
-1. Event loop management: "RuntimeError: Future attached to different loop"
-   - Fixture cleanup happens in wrong event loop context
-   - Affects ALL tests during teardown
-
-2. Connection lifecycle: "InterfaceError: connection has been released back to pool"
-   - Session cleanup tries to close already-released connections
-   - Affects 9/13 tests
-
-3. Missing API: SessionManager.get_all_sessions() doesn't exist
-   - Should use list_sessions() instead
-   - Affects 1 test
-
-See docs/OBSERVATIONS.md and GitHub Issue #29 for detailed analysis.
-
-TODO: Fix these issues before considering integration tests production-ready.
+KNOWN ISSUES:
+- Event loop management in pytest-asyncio session-scoped fixtures may cause
+  teardown errors. Function-scoped fixtures are preferred.
+- These tests are marked with pytestmark = pytest.mark.integration and
+  continue-on-error in CI until all fixture issues are resolved.
 """
 
 import pytest
 import asyncpg
 import os
-import json
 from typing import AsyncGenerator
 
 from coldquery.core.context import ActionContext

@@ -10,9 +10,11 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-and-deploy:
+  build-and-push:
     name: Build and Push Multi-Arch Image
     runs-on: ubuntu-latest
+    permissions:
+      packages: write
 
     steps:
       - uses: actions/checkout@v4
@@ -20,7 +22,7 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
         with:
-          platforms: amd64,arm64
+          platforms: arm64
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -46,76 +48,60 @@ jobs:
 
   deploy:
     name: Deploy to Raspberry Pi
-    needs: build-and-deploy
+    needs: build-and-push
     runs-on: ubuntu-latest
-    env:
-      PI_HOST: ${{ secrets.PI_HOST }}
-      PI_USER: ${{ secrets.PI_USER }}
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up SSH
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.PI_SSH_KEY }}
         run: |
           mkdir -p ~/.ssh
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          echo "${{ secrets.PI_SSH_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H "$PI_HOST" >> ~/.ssh/known_hosts
+          ssh-keyscan -H "${{ secrets.PI_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Copy compose file to Pi
+        run: |
+          scp -i ~/.ssh/id_ed25519 \
+            docker-compose.deploy.yml \
+            "${{ secrets.PI_USER }}@${{ secrets.PI_HOST }}:/opt/coldquery/docker-compose.deploy.yml"
 
       - name: Deploy on Raspberry Pi
-        env:
-          DB_HOST: ${{ secrets.DB_HOST }}
-          DB_PORT: ${{ secrets.DB_PORT }}
-          DB_USER: ${{ secrets.DB_USER }}
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          DB_DATABASE: ${{ secrets.DB_DATABASE }}
-          TS_AUTHKEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
-          GHCR_USERNAME: ${{ github.actor }}
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ssh -i ~/.ssh/id_ed25519 "$PI_USER@$PI_HOST" << 'EOF'
+          ssh -i ~/.ssh/id_ed25519 "${{ secrets.PI_USER }}@${{ secrets.PI_HOST }}" bash -s << EOF
             set -e
 
+            cd /opt/coldquery
+
             # Login to GHCR
-            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
-            # Deployment directory
-            DEPLOY_DIR="/opt/coldquery"
-            mkdir -p "$DEPLOY_DIR"
-            cd "$DEPLOY_DIR"
-
-            # Create docker-compose.yml
-            cat > docker-compose.deploy.yml << 'COMPOSE_EOF'
-            ${{ toJSON(fromJSON(readFile('docker-compose.deploy.yml'))) }}
-            COMPOSE_EOF
-
-            # Create .env file
+            # Create .env file with secrets
             cat > .env << ENVEOF
-            DB_HOST=$DB_HOST
-            DB_PORT=$DB_PORT
-            DB_USER=$DB_USER
-            DB_PASSWORD=$DB_PASSWORD
-            DB_DATABASE=$DB_DATABASE
-            TS_AUTHKEY=$TS_AUTHKEY
-            ENVEOF
+          DB_HOST=${{ secrets.DB_HOST }}
+          DB_PORT=${{ secrets.DB_PORT }}
+          DB_USER=${{ secrets.DB_USER }}
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          DB_DATABASE=${{ secrets.DB_DATABASE }}
+          TS_AUTHKEY=${{ secrets.TAILSCALE_AUTH_KEY }}
+          ENVEOF
 
             # Pull new image and restart
-            docker-compose -f docker-compose.deploy.yml pull
-            docker-compose -f docker-compose.deploy.yml up -d
+            docker compose -f docker-compose.deploy.yml pull
+            docker compose -f docker-compose.deploy.yml up -d
 
             echo "Waiting for health check..."
-            for i in {1..30}; do
-              if docker container inspect coldquery-server --format '{{.State.Health.Status}}' | grep -q "healthy"; then
-                echo "✅ Deployment successful and container is healthy!"
+            for i in \$(seq 1 30); do
+              if docker container inspect coldquery-server --format '{{.State.Health.Status}}' 2>/dev/null | grep -q "healthy"; then
+                echo "Deployment successful and container is healthy!"
                 exit 0
               fi
-              echo "Attempt $i/30: waiting for container to become healthy..."
+              echo "Attempt \$i/30: waiting for container to become healthy..."
               sleep 5
             done
 
-            echo "🚨 Health check failed after 150 seconds."
+            echo "Health check failed after 150 seconds."
             docker logs coldquery-server
             exit 1
           EOF

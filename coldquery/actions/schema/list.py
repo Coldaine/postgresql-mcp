@@ -54,4 +54,4 @@ async def list_handler(params: Dict[str, Any], context: ActionContext) -> str:
     else:
         raise ValueError(f"Unsupported target type: {target}")
 
-    return json.dumps(result.to_dict())
+    return json.dumps(result.to_dict(), default=str)

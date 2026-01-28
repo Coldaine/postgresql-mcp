@@ -14,7 +14,7 @@ def mock_context():
 async def test_health_check_ok(mock_context):
     mock_executor = mock_context.executor
     mock_executor.execute.return_value = QueryResult(
-        rows=[[1]],
+        rows=[{"health_check": 1}],
         row_count=1,
         fields=[],
     )

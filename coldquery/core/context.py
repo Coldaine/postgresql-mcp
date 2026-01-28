@@ -10,7 +10,7 @@ class ActionContext:
     executor: QueryExecutor
     session_manager: SessionManager
 
-def resolve_executor(ctx: ActionContext, session_id: Optional[str]) -> QueryExecutor:
+async def resolve_executor(ctx: ActionContext, session_id: Optional[str]) -> QueryExecutor:
     """
     Selects the appropriate database executor.
 
