@@ -6,17 +6,13 @@ from datetime import datetime, timezone
 
 class JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
-        log_data = {
+        log_data: dict[str, object] = {
             "timestamp": datetime.fromtimestamp(record.created, timezone.utc).isoformat(),
             "level": record.levelname,
             "message": record.getMessage(),
+            "context": record.args if isinstance(record.args, dict) else {},
         }
-        if record.args and isinstance(record.args, dict):
-            log_data["context"] = record.args
-        else:
-            log_data["context"] = {}
-
-        return json.dumps(log_data)
+        return json.dumps(log_data, default=str)
 
 
 def get_logger(name: str) -> logging.Logger:
