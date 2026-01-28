@@ -1,6 +1,5 @@
 from typing import Dict, Any
-from coldquery.core.context import ActionContext
-from coldquery.core.executor import resolve_executor
+from coldquery.core.context import ActionContext, resolve_executor
 from coldquery.security.access_control import require_write_access
 from coldquery.middleware.session_echo import enrich_response
 

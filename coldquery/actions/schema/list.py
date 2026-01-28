@@ -1,15 +1,14 @@
 import json
 from typing import Dict, Any
-from coldquery.core.context import ActionContext
-from coldquery.core.executor import resolve_executor
+from coldquery.core.context import ActionContext, resolve_executor
 
 async def list_handler(params: Dict[str, Any], context: ActionContext) -> str:
     """List database objects."""
     target = params.get("target", "table")
-    params.get("schema")
+    schema = params.get("schema")  # noqa: F841 - TODO: wire up schema filtering
     limit = params.get("limit", 100)
     offset = params.get("offset", 0)
-    params.get("include_sizes", False)
+    include_sizes = params.get("include_sizes", False)  # noqa: F841 - TODO: wire up size inclusion
     session_id = params.get("session_id")
 
     executor = await resolve_executor(context, session_id)

@@ -1,7 +1,6 @@
 import json
 from typing import Dict, Any
-from coldquery.core.context import ActionContext
-from coldquery.core.executor import resolve_executor
+from coldquery.core.context import ActionContext, resolve_executor
 
 async def activity_handler(params: Dict[str, Any], context: ActionContext) -> str:
     """Get active queries."""
