@@ -184,6 +184,12 @@ pytest tests/ -k "test_write" -v
 
 ## Running the Server
 
+### FastMCP CLI (Recommended)
+
+```bash
+fastmcp run coldquery/server.py
+```
+
 ### stdio (for MCP clients)
 
 ```bash

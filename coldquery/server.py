@@ -44,11 +44,12 @@ async def health(request):
     return JSONResponse({"status": "ok"})
 
 
-if __name__ == "__main__":
-    # Import all tools to register them
-    from coldquery.tools import pg_query, pg_tx, pg_schema, pg_admin, pg_monitor  # noqa: F401
-    from coldquery import resources, prompts  # noqa: F401
+# Import all tools to register them
+from coldquery.tools import pg_query, pg_tx, pg_schema, pg_admin, pg_monitor  # noqa: F401, E402
+from coldquery import resources, prompts  # noqa: F401, E402
 
+
+if __name__ == "__main__":
     transport = (
         "http" if "--transport" in sys.argv and "http" in sys.argv else "stdio"
     )
